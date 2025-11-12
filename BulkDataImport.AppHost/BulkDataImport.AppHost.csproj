@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BulkDataImport.Api\BulkDataImport.Api.csproj" />
     <ProjectReference Include="..\BulkDataImport.Migration\BulkDataImport.Migration.csproj" />
   </ItemGroup>
 

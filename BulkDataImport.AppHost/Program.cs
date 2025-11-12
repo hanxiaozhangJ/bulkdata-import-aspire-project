@@ -10,4 +10,9 @@ var db = pgServer.AddDatabase("EntityBulkImport", databaseName: "EntityBulkImpor
 var migration = builder.AddProject<Projects.BulkDataImport_Migration>("migration")
     .WithReference(db);
 
+// Add Web API project - it will wait for migration to complete and receive connection string
+var api = builder.AddProject<Projects.BulkDataImport_Api>("api")
+    .WithReference(db)
+    .WithReference(migration);
+
 builder.Build().Run();
