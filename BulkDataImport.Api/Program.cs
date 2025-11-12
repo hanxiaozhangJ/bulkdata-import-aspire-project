@@ -2,6 +2,7 @@ using Serilog;
 using Serilog.Filters;
 using BulkDataImport.Api;
 using Microsoft.AspNetCore.Diagnostics;
+using FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,9 @@ builder.Host.UseSerilog((hostingContext, services, loggerConfiguration) =>
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+
+// Add FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // Add ProblemDetails service for standardized error responses
 builder.Services.AddProblemDetails();
@@ -52,6 +56,9 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Enable static files (for validation test page)
+app.UseStaticFiles();
+
 // Simple ping endpoint - accessible via both HTTP and HTTPS
 app.MapGet("/ping", (ILogger<Program> logger) =>
 {
@@ -70,5 +77,31 @@ app.MapGet("/", () => Results.Ok("API is running. Try /ping endpoint."))
 app.MapGet("/exception", () => { throw new Exception("Test exception for error handling"); })
     .WithName("exception")
     .AllowAnonymous();
+
+// Validation endpoint to demonstrate FluentValidation with ValidationProblem
+app.MapPost("/validation", async (IValidator<ValidationRequest> validator, ValidationRequest request) =>
+{
+    var validationResult = await validator.ValidateAsync(request);
+
+    if (!validationResult.IsValid)
+    {
+        // Convert FluentValidation errors to dictionary format for ValidationProblem
+        var errors = validationResult.Errors
+            .GroupBy(e => e.PropertyName)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(e => e.ErrorMessage).ToArray()
+            );
+        
+        return Results.ValidationProblem(errors);
+    }
+
+    return Results.Ok(new { message = "Validation successful", request });
+})
+    .WithName("validation")
+    .AllowAnonymous()
+    .Accepts<ValidationRequest>("application/json")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<HttpValidationProblemDetails>(StatusCodes.Status400BadRequest);
 
 app.Run();
