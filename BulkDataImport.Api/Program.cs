@@ -1,5 +1,7 @@
 using Serilog;
 using Serilog.Filters;
+using BulkDataImport.Api;
+using Microsoft.AspNetCore.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,7 +23,20 @@ builder.Host.UseSerilog((hostingContext, services, loggerConfiguration) =>
 // Add services to the container.
 builder.Services.AddOpenApi();
 
+// Add ProblemDetails service for standardized error responses
+builder.Services.AddProblemDetails();
+
+// Register the custom exception handler
+// The UseExceptionHandler middleware will automatically discover IExceptionHandler services
+builder.Services.AddSingleton<IExceptionHandler, DefaultExceptionHandler>();
+
 var app = builder.Build();
+
+// Add exception handling middleware (must be early in the pipeline)
+app.UseExceptionHandler();
+
+// Add status code pages middleware for handling non-exception errors (404, etc.)
+app.UseStatusCodePages();
 
 // Add request logging middleware for debugging
 app.Use(async (context, next) =>
@@ -49,6 +64,11 @@ app.MapGet("/ping", (ILogger<Program> logger) =>
 // Root endpoint for testing
 app.MapGet("/", () => Results.Ok("API is running. Try /ping endpoint."))
     .WithName("Root")
+    .AllowAnonymous();
+
+// Exception endpoint for testing error handling
+app.MapGet("/exception", () => { throw new Exception("Test exception for error handling"); })
+    .WithName("exception")
     .AllowAnonymous();
 
 app.Run();
